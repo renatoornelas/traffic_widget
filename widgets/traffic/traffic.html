@@ -1,0 +1,14 @@
+<h1 class="graph-title" data-bind="title"></h1>
+
+<p class="value traffic_out">
+  <span data-bind="current_out | shortenedBinary | prepend prefix"></span><i class="icon-arrow-up"></i>
+</p>
+
+<p class="value traffic_in">
+  <span data-bind="current_in | shortenedNumber | prepend prefix"></span><i class="icon-arrow-down"></i>
+</p>
+
+<p class="more-info" data-bind="moreinfo"></p>
+
+<p class="updated-at" data-bind="updatedAtMessage"></p>
+
