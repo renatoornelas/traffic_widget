@@ -1,55 +1,52 @@
 require "./lib/cacti"
 
-q = Cacti.new "stat.cityshop.com.br"
+city10 = "http://stat.cityshop.com.br"
+openx = "https://cacti.openx.com.br"
 
 traffic_graphs = []
-traffic_graphs << { :data_handler => "traffic",   :graph_id => 482  }
-traffic_graphs << { :data_handler => "traffic2",  :graph_id => 492  }
-traffic_graphs << { :data_handler => "traffic3",  :graph_id => 1045 }
-traffic_graphs << { :data_handler => "traffic4",  :graph_id => 850  }
-traffic_graphs << { :data_handler => "traffic5",  :graph_id => 1171 }
-traffic_graphs << { :data_handler => "traffic6",  :graph_id => 801  }
-traffic_graphs << { :data_handler => "traffic7",  :graph_id => 1083 }
-traffic_graphs << { :data_handler => "traffic8",  :graph_id => 481  }
-traffic_graphs << { :data_handler => "traffic9",  :graph_id => 1052, :inbound_ds => 'Total IN ', :outbound_ds => 'Total OUT' }
-traffic_graphs << { :data_handler => "traffic10", :graph_id => 1052, :inbound_ds => 'Total IN ', :outbound_ds => 'Total OUT', :graph_start => 43200 }
-traffic_graphs << { :data_handler => "traffic11", :graph_id => 1052, :inbound_ds => 'Total IN ', :outbound_ds => 'Total OUT', :graph_start => 86400 }
-traffic_graphs << { :data_handler => "traffic12", :graph_id => 1052, :inbound_ds => 'Total IN ', :outbound_ds => 'Total OUT', :graph_start => 43200 }
+traffic_graphs << { :cacti => city10, :data_handler => "traffic1",   :graph_id => 482  }
+traffic_graphs << { :cacti => city10, :data_handler => "traffic2",  :graph_id => 492  }
+#traffic_graphs << { :cacti => city10, :data_handler => "traffic3",  :graph_id => 1045 }
+#traffic_graphs << { :cacti => city10, :data_handler => "traffic4",  :graph_id => 850  }
+#traffic_graphs << { :cacti => city10, :data_handler => "traffic5",  :graph_id => 1171 }
+#traffic_graphs << { :cacti => city10, :data_handler => "traffic6",  :graph_id => 801  }
+#traffic_graphs << { :cacti => city10, :data_handler => "traffic7",  :graph_id => 1083 }
+#traffic_graphs << { :cacti => city10, :data_handler => "traffic8",  :graph_id => 481  }
+#traffic_graphs << { :cacti => city10, :data_handler => "traffic9",  :graph_id => 1052, :ds => ['Total IN ', 'Total OUT'] }
+#traffic_graphs << { :cacti => city10, :data_handler => "traffic10", :graph_id => 1052, :ds => ['Total IN ', 'Total OUT'], :start => 43200 }
+#traffic_graphs << { :cacti => city10, :data_handler => "traffic11", :graph_id => 1052, :ds => ['Total IN ', 'Total OUT'], :start => 86400 }
+#traffic_graphs << { :cacti => openx, :data_handler => "traffic12", :graph_id => 206 }
 
+#puts Sinatra::Application.inspect
 
 # last started parkingsessions
-SCHEDULER.every '60s', :first_in => 30 do
-    # Create an instance of our helper class
-    traffic_graphs.each do |graph|
-      
-      inbound_ds = graph[:inbound_ds] || "IN "
-      outbound_ds = graph[:outbound_ds] || "OUT"
-      graph_start = graph[:graph_start] || 43200
-      
-      
-      points_in = q.points graph[:graph_id], inbound_ds, Time.new.to_i-graph_start
-      points_out = q.points graph[:graph_id], outbound_ds, Time.new.to_i-graph_start
-   
-      title = q.title graph[:graph_id]
-     
-      # send to dashboard, so the number the meter and the graph widget can understand it
-      if graph[:data_handler] == "traffic12"
+SCHEDULER.every '30s', :first_in => 0 do
 
-        traffic_data = [
-          {
-            name: "Upload",
-            data: points_out,
-          },
-          {
-            name: "Download",
-            data: points_in,
-          },
-        ]
-        send_event graph[:data_handler], { series: traffic_data, title: title }
-      else 
-        send_event graph[:data_handler], { points_in: points_in, points_out: points_out, title: title }
+#  puts result['graph'].inspect
+  
+  traffic_graphs.each do |graph|
+
+    # Look if we need to change something due to API calls
+    # Like this: curl -d '{ "auth_token": "FNX9qNaeUTXDwMbaw2TEggJTcT8UNmkK", "params": {"start": 7200, "cacti": "https://cacti.openx.com.br", "graph_id": 206 }}' http://localhost:3030/widgets/traffic2
+
+    history = JSON.parse(Sinatra::Application.settings.history[graph[:data_handler]].sub("data: ", ""))
+    if (history['params'])
+
+      history['params'].each do |param|
+        puts param.inspect
+        graph[param[0].to_sym] = param[1]
       end
+      puts graph.inspect
     end
     
+    start = graph[:start] || 43200
+
+    q = Cacti.new graph[:cacti], graph[:graph_id], :data_sources => graph[:ds], :graph_start => start
+ 
+    send_event graph[:data_handler], { series: q.series, title: q.title }
+  end
+  
+
 
 end
+

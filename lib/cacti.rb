@@ -4,28 +4,31 @@ require "json"
 require "date"
 
 class Cacti
-    attr_reader :uri, :data_sources, :graph_data
-    # Pass in the url to where you cacti instance is hosted
-    def initialize(url, graph_id, data_sources=["IN ", "OUT"], graph_start=nil, graph_end=nil)
-        @uri = URI.parse(url)
-        @graph_id = graph_id
-        @data_sources = data_sources
- 
-        graph_start ||= Time.new.to_i - 86400;
-        
-        @graph_data = query graph_id, graph_start, graph_end
+    attr_reader :data_sources, :graph_data
+
+    def initialize(url, graph_id, params={})
+        @data_sources = params[:data_sources] || ["IN ", "OUT"]
+        @graph_data = query url, graph_id, params
     end
 
     # This is the raw query method, it will fetch the 
-    # JSON from the Graphite and parse it
-    def query(graph_id, graph_start=nil, graph_end=nil)
-        graph_start ||= Time.new.to_i - 86400;
+    # JSON from the cacti and parse it
+    def query(url, graph_id, params={})
+      
+        uri = URI.parse(url)
+        # use default graph_json.php cacti endpoint
+        if uri.request_uri == "/"
+          uri = URI.parse(url + "/graph_json.php")
+        end
+      
+        graph_start = params[:graph_start] || 43200 #defaults to 12h data
+        graph_start = Time.new.to_i - graph_start
+        graph_end = params[:graph_end]
+        http = Net::HTTP.new(uri.host, uri.port)
+        http.use_ssl = (uri.port == 443)
+        http.verify_mode = OpenSSL::SSL::VERIFY_NONE
         
-        http     = Net::HTTP.new (@uri.host)
-        
-        http.use_ssl = (@uri.port == 443)
-        
-        request  = http.request Net::HTTP::Get.new("#{@uri.request_uri}?local_graph_id=#{graph_id}&rra_id=0&view_type=&graph_start=#{graph_start}&graph_end=#{graph_end}")
+        request  = http.request Net::HTTP::Get.new("#{uri.request_uri}?local_graph_id=#{graph_id}&rra_id=0&view_type=&graph_start=#{graph_start}&graph_end=#{graph_end}")
 
         result = JSON.parse(request.body, :symbolize_names => true, :allow_nan => true)
         return result
@@ -81,7 +84,19 @@ class Cacti
     end
       
     def title
-        title = @graph_data[:meta][:title]
+        return @graph_data[:meta][:title]
     end
+    
+    def start_date
+        return @graph_data[:meta][:start_date]
+    end
+    
+    def end_date
+        return @graph_data[:meta][:end_date]
+    end
+    def vertical_label
+      return @graph_data[:meta][:vertical_label]
+    end
+      
     
 end
